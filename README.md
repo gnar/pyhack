@@ -1,4 +1,4 @@
 pyhack
 ======
 
-A simple ASCII roguelike written in Python
+A simple ASCII roguelike written in Python.
