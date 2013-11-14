@@ -64,6 +64,8 @@ class Level(object):
     for y in range(self.height):
       for x in range(self.width):
         self.set_cell(x, y, self.cells_map[y][x])
+    for mon in self.monsters:
+      if mon.is_alive: self.maptool.set_flag(x, y, maptool.MONSTER_FLAG, True)
     return self.maptool
 
   def _rebuild_monsters_map(self):
@@ -184,12 +186,14 @@ class Level(object):
     mon.location = monster.Location(self, x, y)
     self.monsters.append(mon)
     self.monsters_map[y][x] = mon
+    self.maptool.set_flag(x, y, maptool.MONSTER_FLAG, True)
 
   def remove_monster(self, mon):
     loc = mon.location
     assert loc.level == self
     self.monsters.remove(mon)
     self.monsters_map[loc.y][loc.x] = None
+    self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, False)
     mon.location = None
     # Gotcha: Also remove from seen_monsters list!
     if mon in self.seen_monsters: self.seen_monsters.remove(mon)
@@ -203,9 +207,9 @@ class Level(object):
     loc = mon.location
     assert loc.level == self
     assert not self.monsters_map[y][x]
-    self.monsters_map[loc.y][loc.x] = None
+    self.monsters_map[loc.y][loc.x] = None; self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, False)
     loc.x, loc.y = x, y
-    self.monsters_map[loc.y][loc.x] = mon
+    self.monsters_map[loc.y][loc.x] = mon; self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, True)
 
   def nudge_monster_at(self, x, y):
     """Make sure that any monster at (x,y) is moved onto another cell."""

@@ -4,6 +4,8 @@ import cells
 import ai
 import savegame
 
+debug_show_distances = False
+
 class Pager(object):
   more_txt = "(more)"
   more_len = len(more_txt)+1
@@ -132,6 +134,9 @@ class Camera(object):
     # Draw cells
     for x, y, cell in level.iter_cells(x_range, y_range):
       ch, col = level.explored_map[y][x]
+      if debug_show_distances:
+        d = level.maptool.get_distance_map(x, y)
+        if d > 0: ch = str(d%10)[0]
       go(x+dx, y+dy)
       color(col)
       put(ch)
@@ -270,6 +275,9 @@ def do_player():
   elif ch == 'Q':
     quit = yes_no("Do you want to quit?")
     if quit: return "quit"
+  elif ch == 'x':
+    global debug_show_distances
+    debug_show_distances = not debug_show_distances
   elif ch == '?':
     put("pos=(%s,%s)", pc.location.x, pc.location.y)
   else:
