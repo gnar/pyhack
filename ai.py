@@ -16,6 +16,7 @@ def do_walk_or_attack(level, mon, dir):
 
 def turn(level, mon):
   x, y = level.get_monster_pos(mon)
-  dx, dy = level.maptool.get_distance_map_dir(x, y)
-  if (dx,dy) == (0,0): dx, dy = misc.randir()
+  #dx, dy = level.maptool.get_distance_map_dir(x, y)
+  #if (dx,dy) == (0,0): 
+  dx, dy = misc.randir()
   do_walk_or_attack(level, mon, (dx, dy))

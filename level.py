@@ -8,23 +8,17 @@ import monster_template
 #import item_template
 import level_template
 
-import maptool
+import map as _map
 
 import term
 import dice
 import cells
 
+OPAQUE_FLAG   = (1<<0)
+WALKABLE_FLAG = (1<<1)
+MONSTER_FLAG  = (1<<2)
+
 class Level(object):
-
-  # Mappings:
-  #   cell_map (contains level cells)
-  #   explored_map (cells seen by pc: (ch,col) pairs)
-  #
-  # Derived:
-  #   monsters_map (derived from self.monsters)
-
-  def _make_mapping(self, default_entry=None):
-    return [[default_entry for x in range(self.width)] for y in range(self.height)]
 
   def __init__(self, template):
     if isinstance(template, str):
@@ -40,8 +34,8 @@ class Level(object):
 
   def __getattr__(self, name):
     t = self.__dict__.get("template", None)
-    if name == "maptool":
-      return self._rebuild_maptool()
+    if name == "flags":
+      return self._rebuild_map()
     elif name == "monsters_map":
       return self._rebuild_monsters_map()
     else:
@@ -57,16 +51,29 @@ class Level(object):
       if dice.chance(self.spawn_rate):
         self.spawn_random_monster()
 
-  # pickling management
+  ################################################################################
+  # Derived mappings                                                             #
+  ################################################################################
 
-  def _rebuild_maptool(self):
-    self.maptool = maptool.MapTool(self.width, self.height)
+  # Mappings:
+  #   cells_map (contains level cells)
+  #   explored_map (cells as last seen by pc: (ch,col) pairs)
+  #
+  # Derived:
+  #   monsters_map (derived from self.monsters)
+
+  def _make_mapping(self, default_entry=None):
+    return [[default_entry for x in range(self.width)] for y in range(self.height)]
+
+
+  def _rebuild_map(self):
+    self.flags = _map.Map(self.width, self.height)
     for y in range(self.height):
       for x in range(self.width):
         self.set_cell(x, y, self.cells_map[y][x])
     for mon in self.monsters:
-      if mon.is_alive: self.maptool.set_flag(x, y, maptool.MONSTER_FLAG, True)
-    return self.maptool
+      if mon.is_alive: self.flags.set(x, y, MONSTER_FLAG, True)
+    return self.flags
 
   def _rebuild_monsters_map(self):
     self.monsters_map = self._make_mapping()
@@ -77,7 +84,7 @@ class Level(object):
 
   def __getstate__(self):
     data = dict(self.__dict__)
-    data.pop("maptool", None)
+    data.pop("flags", None)
     data.pop("monsters_map", None)
     return data
 
@@ -86,7 +93,7 @@ class Level(object):
   ################################################################################
 
   def generate_cells(self):
-    self.maptool = maptool.MapTool(self.width, self.height)
+    self.flags = _map.Map(self.width, self.height)
     self.cells_map = self._make_mapping()
     self.explored_map = self._make_mapping((' ', 8))
 
@@ -140,8 +147,8 @@ class Level(object):
 
   def set_cell(self, x, y, cell):
     self.cells_map[y][x] = cell
-    self.maptool.set_flag(x, y, maptool.OPAQUE_FLAG, cells.is_opaque(cell))
-    self.maptool.set_flag(x, y, maptool.WALKABLE_FLAG, cells.is_walkable(cell))
+    self.flags.set(x, y, OPAQUE_FLAG, cells.is_opaque(cell))
+    self.flags.set(x, y, WALKABLE_FLAG, cells.is_walkable(cell))
 
   def cell_gfx(self, x, y):
     return cells.gfx(self.cells_map[y][x])
@@ -158,23 +165,22 @@ class Level(object):
       yield x, y, mon
 
   def calculate_fov(self, x, y, radius):
-    self.maptool.calculate_fov(x, y, radius)
-    self.seen_monsters = []
+    seen_cells = self.flags.calculate_fov(x, y, radius, 0, OPAQUE_FLAG)
 
     monsters_map = self.monsters_map
-    is_visible = lambda x, y: self.maptool.get_flag(x, y, maptool.VISIBLE_FLAG)
+    cells_map = self.cells_map
+    explored_map = self.explored_map
 
-    for y in range(self.height):
-      cells_row = self.cells_map[y]
-      explored_row = self.explored_map[y]
-      for x in range(self.width):
-        if is_visible(x, y):
-          explored_row[x] = cells.gfx(cells_row[x])
-          mon = monsters_map[y][x]
-          if mon and mon.is_alive: self.seen_monsters.append(mon)
+    self.seen_monsters = []
+    for x, y in seen_cells:
+      explored_map[y][x] = cells.gfx(cells_map[y][x])
+      mon = monsters_map[y][x]
+      if mon and mon.is_alive:
+        self.seen_monsters.append(mon)
 
   def calculate_distance_map(self, points):
-    self.maptool.calculate_distance_map(points)
+    self.dist_map = self.flags.calculate_distance_map(points, WALKABLE_FLAG, WALKABLE_FLAG)
+    return self.dist_map
 
   ################################################################################
   # Monsters                                                                     #
@@ -186,14 +192,14 @@ class Level(object):
     mon.location = monster.Location(self, x, y)
     self.monsters.append(mon)
     self.monsters_map[y][x] = mon
-    self.maptool.set_flag(x, y, maptool.MONSTER_FLAG, True)
+    self.flags.set(x, y, MONSTER_FLAG, True)
 
   def remove_monster(self, mon):
     loc = mon.location
     assert loc.level == self
     self.monsters.remove(mon)
     self.monsters_map[loc.y][loc.x] = None
-    self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, False)
+    self.flags.set(loc.x, loc.y, MONSTER_FLAG, False)
     mon.location = None
     # Gotcha: Also remove from seen_monsters list!
     if mon in self.seen_monsters: self.seen_monsters.remove(mon)
@@ -207,9 +213,9 @@ class Level(object):
     loc = mon.location
     assert loc.level == self
     assert not self.monsters_map[y][x]
-    self.monsters_map[loc.y][loc.x] = None; self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, False)
+    self.monsters_map[loc.y][loc.x] = None; self.flags.set(loc.x, loc.y, MONSTER_FLAG, False)
     loc.x, loc.y = x, y
-    self.monsters_map[loc.y][loc.x] = mon; self.maptool.set_flag(loc.x, loc.y, maptool.MONSTER_FLAG, True)
+    self.monsters_map[loc.y][loc.x] = mon; self.flags.set(loc.x, loc.y, MONSTER_FLAG, True)
 
   def nudge_monster_at(self, x, y):
     """Make sure that any monster at (x,y) is moved onto another cell."""

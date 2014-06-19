@@ -1,7 +1,7 @@
 pyhack
 ======
 
-A simple ASCII roguelike written in Python.
+A simple ASCII roguelike written in Python. Work in progress.
 
 This should work with Python 2.7+ and 3+. 
 

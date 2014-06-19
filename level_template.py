@@ -21,7 +21,7 @@ class LevelTemplate(object):
 
 def load(level_id, **kwargs):
   print("Loading", level_id)
-  filename = "data/level_template/%s.yaml" % level_id
+  filename = "data/template/level/%s.yaml" % level_id
   with open(filename, "r") as fd:
     data = yaml.load(fd)
   data.update(kwargs)

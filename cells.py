@@ -3,7 +3,6 @@ import dice
 
 class Cell(object):
   alias = None
-  default_cell_info = ()
   default_kick_msg = "Ouch! You hurt your foot!"
   default_open_msg = "You see nothing you could open."
   default_close_msg = "You see nothing you could open."
@@ -98,7 +97,7 @@ class Floor(Cell):
   default_is_walkable = True
   default_is_opaque = False
   default_gfx = ('.', 7)
-  default_descr = "Floor."
+  default_descr = "floor."
 
 class Grass(Cell):
   default_is_walkable = True
@@ -151,8 +150,12 @@ class Altar(Cell):
   alias = '_'
   default_is_walkable = True
   default_is_opaque = False
-  default_gfx = ('_', 7)
-  default_cell_info = ('neutral',)
+  default_properties = {'alignment': 'neutral'}
+
+  _col_map = {'lawful': 15, 'neutral': 8, 'evil': 7}
+
+  def gfx(self):
+    return '_', Altar._col_map[self.alignment]
 
 class AbstractPortal(Cell):
   default_is_walkable = True
@@ -225,6 +228,7 @@ db = {
   'stairs_up': StairsUp,
   'stairs_down': StairsDown,
   'tunnel': Tunnel,
+  'altar': Altar,
 }
 
 db_alias = {cell_class.alias: cell_class for cell_class in db.values() if cell_class.alias is not None}
